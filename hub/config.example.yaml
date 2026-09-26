@@ -1,0 +1,164 @@
+# Home Emergency Alert Hub - configuration
+# Copy to config.yaml, fill in the real details, keep it OUT of git (see .gitignore).
+# Any string may contain ${ENV_VAR} to pull secrets from the environment.
+
+hub:
+  base_url: https://alert.example.com          # public URL of this hub (used in every alert link)
+  device_token: ${HUB_DEVICE_TOKEN}            # buttons/phones authenticate with this; 32+ random chars
+  responder_token: ${HUB_RESPONDER_TOKEN}      # embedded in alert links; 32+ random chars
+  timezone: Asia/Kolkata
+  db_path: /data/hub.sqlite3
+  watchdog_interval_s: 30
+  offline_alert_contacts: [maitrabh, brother]  # who hears about a dead button (no siren, high priority)
+  test_contacts: [maitrabh]
+
+home:
+  name: "Mummy-Papa's house"
+  address: "House no, Street, Colony, City, State PIN"
+  plus_code: "XXXX+XX City"                     # from Google Maps > share > plus code. Also DIGIPIN from India Post.
+  maps_url: "https://maps.google.com/?q=LAT,LNG"
+  landmark_directions: "From the main road take the lane opposite the temple; blue gate, 3rd house on the left. Someone will be at the gate."
+  oxygen_note: "Concentrator in the hall cupboard, cylinder + regulator in Papa's room. Flow card taped to the machine."
+  nearest_hospitals:
+    - name: "BIG HOSPITAL (24x7 cath lab + CT + stroke)"
+      phone: "+91XXXXXXXXXX"
+      maps_url: "https://maps.google.com/?q=..."
+      drive_minutes: 35
+      notes: "Go here for chest pain / stroke. Ask for Emergency."
+    - name: "Nearer hospital (24x7 CT, can thrombolyse, no cath lab)"
+      phone: "+91XXXXXXXXXX"
+      maps_url: "https://maps.google.com/?q=..."
+      drive_minutes: 15
+      notes: "Fallback if the patient is unstable."
+
+devices:
+  - id: mom-room-button
+    label: "Mom's room (wall button)"
+    person: "Mom"
+    heartbeat_timeout_s: 300
+  - id: dad-room-button
+    label: "Dad's room (wall button)"
+    person: "Dad"
+    heartbeat_timeout_s: 300
+  - id: mom-room-phone
+    label: "Mom's room (phone)"
+    person: "Mom"
+    heartbeat_timeout_s: 600
+  - id: dad-room-phone
+    label: "Dad's room (phone)"
+    person: "Dad"
+    heartbeat_timeout_s: 600
+
+contacts:
+  - id: maitrabh
+    name: "Maitrabh"
+    role: family
+    eta_minutes: 90
+    channels: { pushover_user_key: "${PUSHOVER_MAITRABH}", ntfy_topic: "home-sos-maitrabh-a8f3k2", sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX", telegram_chat_id: "123456789" }
+  - id: brother
+    name: "Brother"
+    role: family
+    channels: { pushover_user_key: "${PUSHOVER_BROTHER}", sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX" }
+  - id: mom
+    name: "Mom"
+    role: parent
+    channels: { ntfy_topic: "home-sos-mom-k29dh1", voice: "+91XXXXXXXXXX" }
+  - id: dad
+    name: "Dad"
+    role: parent
+    channels: { ntfy_topic: "home-sos-dad-p31xz9", voice: "+91XXXXXXXXXX" }
+  - id: driver
+    name: "Driver (7-8 min away)"
+    role: driver
+    eta_minutes: 8
+    channels: { sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX", ntfy_topic: "home-sos-driver-q7m2ls" }
+  - id: neighbour1
+    name: "Neighbour 1"
+    role: responder
+    eta_minutes: 3
+    channels: { sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX" }
+  - id: neighbour2
+    name: "Neighbour 2"
+    role: responder
+    eta_minutes: 4
+    channels: { sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX" }
+  - id: doctor
+    name: "Dr. (society)"
+    role: doctor
+    eta_minutes: 6
+    channels: { sms: "+91XXXXXXXXXX", voice: "+91XXXXXXXXXX" }
+
+# The ladder. at_s = seconds after the button press. only_if gates on live state.
+escalation:
+  - name: "T0 siren: family + parents"
+    at_s: 0
+    contacts: [maitrabh, brother, mom, dad]
+    methods: [push, sms, telegram]
+  - name: "T0 local responders"
+    at_s: 0
+    contacts: [driver, neighbour1, neighbour2, doctor]
+    methods: [push, sms]
+  - name: "T+60s call family if nobody is on the way"
+    at_s: 60
+    only_if: no_ack
+    contacts: [maitrabh, brother]
+    methods: [voice]
+  - name: "T+90s call the neighbours + driver"
+    at_s: 90
+    only_if: no_ack
+    contacts: [neighbour1, neighbour2, driver]
+    methods: [voice]
+  - name: "T+3min call the doctor, keep calling everyone every 3 min"
+    at_s: 180
+    only_if: no_ack
+    contacts: [doctor, maitrabh, brother, neighbour1, neighbour2, driver]
+    methods: [voice, push]
+    repeat_every_s: 180
+    max_repeats: 10
+  - name: "T+15min nobody has ARRIVED: re-alert everyone"
+    at_s: 900
+    only_if: no_arrival
+    contacts: [maitrabh, brother, driver, neighbour1, neighbour2, doctor]
+    methods: [push, voice]
+    repeat_every_s: 600
+    max_repeats: 6
+
+# Side effects when a panic incident opens (not for tests).
+actions:
+  - name: "Home Assistant: lights on, siren"
+    type: webhook
+    url: "https://ha.example.com/api/webhook/panic-${HA_WEBHOOK_ID}"
+    body: { source: hub }
+
+providers:
+  # Loud on iPhone AND Android, repeats until acknowledged. One-time app purchase per person.
+  pushover:
+    app_token: ${PUSHOVER_APP_TOKEN}
+    sound: siren
+    retry: 30
+    expire: 1800
+  # Free, self-hostable, Android "max priority" overrides DND. Use random topic names.
+  ntfy:
+    server: https://ntfy.sh
+    # token: ${NTFY_TOKEN}
+  # SMS from a spare Android phone with a prepaid SIM (no TRAI DLT paperwork).
+  smsgate:
+    url: https://api.sms-gate.app/3rdparty/v1
+    username: ${SMSGATE_USER}
+    password: ${SMSGATE_PASS}
+  # Voice calls from an Indian number (best for waking people up).
+  # exotel:
+  #   sid: ${EXOTEL_SID}
+  #   api_key: ${EXOTEL_KEY}
+  #   api_token: ${EXOTEL_TOKEN}
+  #   subdomain: api.exotel.com
+  #   caller_id: "0XXXXXXXXXX"   # your ExoPhone
+  #   app_id: "12345"           # flow that reads the emergency message
+  # Alternative voice + SMS (international provider; check India voice rules).
+  # twilio:
+  #   account_sid: ${TWILIO_SID}
+  #   auth_token: ${TWILIO_TOKEN}
+  #   from_voice: "+1XXXXXXXXXX"
+  #   from_sms: "+1XXXXXXXXXX"
+  telegram:
+    bot_token: ${TELEGRAM_BOT_TOKEN}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Emergency at home</title>
+<style>
+  :root { --bg:#fff; --fg:#111; --muted:#555; --card:#f4f4f4; --red:#c0392b; --green:#1e8449; --amber:#b9770e; --blue:#1f4e79; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121212; --fg:#f2f2f2; --muted:#bbb; --card:#1e1e1e; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; font: 18px/1.4 -apple-system, system-ui, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--fg); }
+  h1 { font-size:26px; margin:0 0 8px; }
+  h2 { font-size:20px; margin:24px 0 8px; }
+  .banner { padding:16px; border-radius:12px; color:#fff; background:var(--red); font-weight:700; font-size:22px; }
+  .banner.test { background:var(--blue); }
+  .banner.acked { background:var(--amber); }
+  .banner.resolved { background:var(--green); }
+  .card { background:var(--card); border-radius:12px; padding:14px; margin:12px 0; }
+  .big { display:block; width:100%; padding:18px; margin:8px 0; font-size:20px; font-weight:700; border:0; border-radius:12px; color:#fff; cursor:pointer; }
+  .big.go { background:var(--green); } .big.seen { background:var(--blue); } .big.arrived { background:var(--amber); } .big.no { background:#7f8c8d; } .big.done { background:#333; }
+  .big:disabled { opacity:.5; }
+  a.call { display:inline-block; padding:12px 16px; margin:4px 4px 4px 0; background:var(--blue); color:#fff; border-radius:10px; text-decoration:none; font-weight:700; }
+  a.call.emerg { background:var(--red); }
+  select, input { font-size:18px; padding:10px; width:100%; margin:6px 0; border-radius:8px; border:1px solid #999; background:var(--bg); color:var(--fg); }
+  ul { padding-left:20px; margin:6px 0; } li { margin:6px 0; }
+  .muted { color:var(--muted); font-size:15px; }
+  details { margin:8px 0; background:var(--card); border-radius:10px; padding:8px 12px; }
+  summary { font-weight:700; cursor:pointer; font-size:18px; padding:6px 0; }
+  .do li::marker { content:"✅ "; } .dont li::marker { content:"⛔ "; }
+  .timer { font-variant-numeric: tabular-nums; }
+  .ack { padding:6px 0; border-bottom:1px solid #8884; }
+</style>
+</head>
+<body>
+<div id="banner" class="banner">Loading…</div>
+<div class="card">
+  <div id="where"></div>
+  <div id="timer" class="timer muted"></div>
+</div>
+
+<div class="card" id="respond">
+  <label for="who">I am</label>
+  <select id="who"></select>
+  <button class="big go" onclick="ack('on_my_way')">🚗 ON MY WAY</button>
+  <label for="eta" class="muted">My ETA (minutes)</label>
+  <input id="eta" type="number" inputmode="numeric" placeholder="e.g. 8">
+  <button class="big seen" onclick="ack('seen')">👀 Seen, coordinating by phone</button>
+  <button class="big arrived" onclick="ack('arrived')">🏠 I have ARRIVED</button>
+  <button class="big no" onclick="ack('cannot_come')">✋ I cannot come</button>
+</div>
+
+<h2>Call</h2>
+<div class="card" id="calls"></div>
+
+<h2>Who is responding</h2>
+<div class="card" id="acks"><span class="muted">Nobody yet.</span></div>
+
+<h2>What to do</h2>
+<div id="universal"></div>
+<div id="playbooks"></div>
+<div id="oxygen"></div>
+<div id="dispatcher"></div>
+
+<h2>Hospitals</h2>
+<div class="card" id="hospitals"></div>
+
+<div class="card">
+  <button class="big done" onclick="resolve()">✔ Mark incident RESOLVED (everyone is told)</button>
+  <input id="note" placeholder="Short note: what happened, where they were taken">
+</div>
+<p class="muted" id="deliveries"></p>
+
+<script>
+const path = location.pathname.split('/');
+const iid = path[path.length-1];
+const token = new URLSearchParams(location.search).get('t') || '';
+const api = (p) => `/api/v1${p}${p.includes('?')?'&':'?'}t=${encodeURIComponent(token)}`;
+let data = null, playbooks = null;
+const $ = (id) => document.getElementById(id);
+
+function fmt(ts){ return new Date(ts*1000).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }
+function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function load(){
+  const r = await fetch(api(`/incidents/${iid}`));
+  if(!r.ok){ $('banner').textContent = 'Could not load incident ('+r.status+'). Call the house directly.'; return; }
+  data = await r.json();
+  if(!playbooks){ try{ playbooks = await (await fetch(api('/playbooks'))).json(); }catch(e){ playbooks = {}; } renderPlaybooks(); }
+  render();
+}
+
+function render(){
+  const inc = data.incident, dev = data.device, home = data.home;
+  const b = $('banner');
+  b.className = 'banner';
+  if(inc.resolved_at){ b.classList.add('resolved'); b.textContent = `RESOLVED by ${inc.resolved_by||'?'} at ${fmt(inc.resolved_at)}`; }
+  else if(inc.kind==='test'){ b.classList.add('test'); b.textContent = `TEST alert from ${dev.label}`; }
+  else if(inc.acked_at){ b.classList.add('acked'); b.textContent = `${dev.person} pressed the panic button. Help is on the way.`; }
+  else { b.textContent = `${dev.person} pressed the panic button in ${dev.label}. NOBODY HAS RESPONDED YET.`; }
+
+  $('where').innerHTML = `<b>${esc(home.name)}</b> · pressed at <b>${fmt(inc.opened_at)}</b><br>${esc(home.address)}`
+    + (home.landmark_directions ? `<br><span class="muted">${esc(home.landmark_directions)}</span>` : '')
+    + (home.maps_url ? `<br><a class="call" href="${esc(home.maps_url)}" target="_blank">📍 Open map / navigate</a>` : '')
+    + (home.plus_code ? ` <span class="muted">Plus code: ${esc(home.plus_code)}</span>` : '')
+    + (home.oxygen_note ? `<br><span class="muted">Oxygen: ${esc(home.oxygen_note)}</span>` : '');
+
+  const who = $('who');
+  if(!who.options.length){
+    const saved = localStorage.getItem('contact_id');
+    for(const c of data.contacts){ if(c.role==='parent') continue; const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.name} (${c.role})`; if(c.id===saved) o.selected=true; who.appendChild(o); }
+    who.onchange = ()=>localStorage.setItem('contact_id', who.value);
+  }
+  $('respond').style.display = inc.resolved_at ? 'none' : '';
+
+  let calls = `<a class="call emerg" href="tel:112">📞 112</a><a class="call emerg" href="tel:108">🚑 108</a>`;
+  for(const c of data.contacts){ if(c.phone) calls += `<a class="call" href="tel:${esc(c.phone)}">${esc(c.name)}</a>`; }
+  $('calls').innerHTML = calls;
+
+  if(data.acks.length){
+    $('acks').innerHTML = data.acks.map(a=>{ const c=data.contacts.find(x=>x.id===a.contact_id)||{name:a.contact_id};
+      const s={seen:'saw the alert',on_my_way:'is ON THE WAY'+(a.eta_minutes?` (ETA ~${a.eta_minutes} min)`:''),arrived:'has ARRIVED',cannot_come:'cannot come'}[a.status];
+      return `<div class="ack"><b>${esc(c.name)}</b> ${s} <span class="muted">${fmt(a.at)}</span>${a.note?`<br><span class="muted">${esc(a.note)}</span>`:''}</div>`; }).join('');
+  }
+
+  $('hospitals').innerHTML = (home.nearest_hospitals||[]).map(h=>`<div class="ack"><b>${esc(h.name)}</b>${h.drive_minutes?` · ~${h.drive_minutes} min`:''}${h.notes?` · ${esc(h.notes)}`:''}<br>${h.phone?`<a class="call" href="tel:${esc(h.phone)}">📞 ${esc(h.phone)}</a>`:''}${h.maps_url?`<a class="call" href="${esc(h.maps_url)}" target="_blank">📍 Navigate</a>`:''}</div>`).join('') || '<span class="muted">No hospitals configured yet.</span>';
+
+  const ok = data.deliveries.filter(d=>d.ok).length, bad = data.deliveries.filter(d=>!d.ok).length;
+  $('deliveries').textContent = `Alerts sent: ${ok} ok, ${bad} failed. Incident ${inc.id}.`;
+}
+
+function list(items, cls){ return `<ul class="${cls||''}">${(items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`; }
+function renderPlaybooks(){
+  const p = playbooks || {};
+  if(p.universal) $('universal').innerHTML = `<div class="card"><b>${esc(p.universal.title)}</b>${list(p.universal.steps)}</div>`;
+  $('playbooks').innerHTML = (p.playbooks||[]).map(pb=>`<details><summary>${esc(pb.title)}</summary>
+      <b>Recognise</b>${list(pb.recognise)}<b>Do</b>${list(pb.do,'do')}<b>Don't</b>${list(pb.dont,'dont')}${pb.window?`<p class="muted">⏱ ${esc(pb.window)}</p>`:''}</details>`).join('');
+  if(p.oxygen) $('oxygen').innerHTML = `<details><summary>${esc(p.oxygen.title)}</summary>${list(p.oxygen.steps)}</details>`;
+  if(p.dispatcher_script) $('dispatcher').innerHTML = `<details><summary>${esc(p.dispatcher_script.title)}</summary>${list(p.dispatcher_script.steps)}</details>`;
+}
+
+async function ack(status){
+  const contact_id = $('who').value; if(!contact_id){ alert('Choose your name first'); return; }
+  const eta = parseInt($('eta').value,10);
+  const r = await fetch(api(`/incidents/${iid}/ack`), {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({contact_id, status, eta_minutes: isNaN(eta)?null:eta})});
+  if(!r.ok){ alert('Failed: '+r.status+'. Call the house directly.'); return; }
+  data = await r.json(); render();
+}
+async function resolve(){
+  const contact_id = $('who').value; if(!contact_id){ alert('Choose your name first'); return; }
+  if(!confirm('Mark this incident as resolved? Everyone will be told to stand down.')) return;
+  const r = await fetch(api(`/incidents/${iid}/resolve`), {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({contact_id, note: $('note').value||null})});
+  if(!r.ok){ alert('Failed: '+r.status); return; }
+  data = await r.json(); render();
+}
+setInterval(()=>{ if(!data) return; const s=Math.max(0,Math.floor(Date.now()/1000-data.incident.opened_at)); $('timer').textContent = `⏱ ${Math.floor(s/60)} min ${s%60} s since the button was pressed`; }, 1000);
+load(); setInterval(load, 10000);
+</script>
+</body>
+</html>

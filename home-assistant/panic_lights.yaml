@@ -1,0 +1,58 @@
+# Home Assistant automation: the hub calls this webhook when a panic incident opens.
+# Turns every configured light on full white, flashes the room's bulb, and (if you
+# have one) sounds a local siren. Works over LAN even if the internet is down as
+# long as the hub is local; if the hub is in the cloud this needs Nabu Casa or a
+# reverse proxy to expose the webhook.
+#
+# Add to automations.yaml or paste into Settings -> Automations -> Edit in YAML.
+# Set the webhook id to match hub config.yaml -> actions[].url.
+
+- id: panic_button_lights
+  alias: "Panic button: lights and siren"
+  mode: single
+  trigger:
+    - platform: webhook
+      webhook_id: panic-CHANGE-ME-random-string
+      allowed_methods: [POST]
+      local_only: false
+  action:
+    - service: light.turn_on
+      target:
+        entity_id:
+          - light.mom_room
+          - light.dad_room
+          - light.hall
+          - light.porch          # so the responder/ambulance can find the gate
+      data:
+        brightness_pct: 100
+        color_temp_kelvin: 4000
+    - service: light.turn_on
+      target:
+        entity_id: light.porch
+      data:
+        flash: long
+    # Optional: a Sonoff/Shelly relay driving a 12 V siren, auto-off after 2 min
+    - service: switch.turn_on
+      target:
+        entity_id: switch.hall_siren
+    - delay: "00:02:00"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.hall_siren
+
+# Optional second automation: TTS on a Google Nest / Alexa in the hall so the OTHER
+# parent hears which room needs help.
+- id: panic_button_tts
+  alias: "Panic button: announce"
+  trigger:
+    - platform: webhook
+      webhook_id: panic-CHANGE-ME-random-string
+      allowed_methods: [POST]
+      local_only: false
+  action:
+    - service: tts.speak
+      target:
+        entity_id: tts.google_translate_en_com
+      data:
+        media_player_entity_id: media_player.hall_speaker
+        message: "Emergency. The panic button was pressed in {{ trigger.json.device | default('a bedroom') }}. Help has been called. Go to the room now."

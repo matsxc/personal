@@ -1,0 +1,4 @@
+# Replace with your domain. Caddy fetches the TLS certificate automatically.
+alert.example.com {
+    reverse_proxy hub:8000
+}

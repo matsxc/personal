@@ -1,0 +1,26 @@
+# Run the hub on a small VPS (or a Raspberry Pi with a UPS). Put it behind
+# Caddy/Traefik for HTTPS; the alert links must be https so phones open them.
+services:
+  hub:
+    build: .
+    restart: unless-stopped
+    ports: ["127.0.0.1:8000:8000"]
+    volumes:
+      - ./config.yaml:/config/config.yaml:ro
+      - hub-data:/data
+    env_file: .env          # HUB_DEVICE_TOKEN, HUB_RESPONDER_TOKEN, PUSHOVER_APP_TOKEN, ...
+    environment:
+      HUB_LOG: INFO
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [hub]
+
+volumes:
+  hub-data:
+  caddy-data:

@@ -1,0 +1,192 @@
+# Emergency playbooks shown on the responder page.
+# Written for a scared family member at 2 a.m. Short lines. Verbs first.
+# Sources: AHA 2025 BLS, Indian Resuscitation Council COLS, BTS emergency oxygen
+# guideline, ADA 2026 hypoglycaemia standards, MoHFW oximeter thresholds.
+# See docs/MEDICAL_PLAYBOOKS.md for the full cited version. Review with the
+# parents' own doctor and edit for their specific conditions.
+
+universal:
+  title: "FIRST 60 SECONDS (every emergency)"
+  steps:
+    - "Call the house / the parent on speaker while you read this. Do they answer? Can they talk?"
+    - "Someone dials 112 (or 108) NOW. Say: ambulance, the address, the landmark, the patient's age and the one-line problem."
+    - "Note the TIME symptoms started. Doctors will ask 'last seen normal'."
+    - "Nothing by mouth if drowsy, confused or unconscious. No water, no tablets, no sugar."
+    - "Oxygen only if the oximeter reads under 90-92%. Oxygen does NOT treat chest pain or stroke."
+    - "Grab the RED FOLDER by the door (medicine list, reports, Aadhaar, insurance, cash)."
+
+oxygen:
+  title: "Home oxygen rules"
+  steps:
+    - "Put the pulse oximeter on a warm finger, sit still 30 seconds."
+    - "94% or above: no oxygen needed."
+    - "90-93%: call the doctor, recheck in 5 min, start 1-2 L/min if breathless."
+    - "90% or below, or blue lips, or confusion: ambulance + oxygen now."
+    - "Target 94-98%. If the doctor has said they retain CO2 (COPD): target 88-92%, start at 1-2 L/min only."
+    - "No flame, agarbatti, diya, stove, heater or smoking within 3 metres. Cylinder upright and chained."
+
+playbooks:
+  - id: chest_pain
+    title: "Chest pain / suspected heart attack"
+    recognise:
+      - "Pressure, tightness, heaviness in the chest for more than a few minutes."
+      - "Pain into arm, jaw, neck or back. Sweating, nausea, breathless."
+      - "In elderly / diabetic people the pain is often ABSENT: sudden breathlessness, extreme weakness, 'gas' pain, collapse."
+    do:
+      - "Sit them semi-reclined. Keep them still and calm. No walking."
+      - "If awake, can swallow, not allergic, no recent bleeding: CHEW plain aspirin 300 mg (two 150 mg or four 75 mg tablets)."
+      - "If they have their OWN prescribed sorbitrate / nitroglycerin: one tablet under the tongue, sitting. Max 3, 5 min apart."
+      - "If they stop responding and are not breathing normally: start CPR (see Cardiac arrest)."
+    dont:
+      - "Do not give oxygen unless SpO2 is under 90%."
+      - "Do not give nitroglycerin if they look faint or grey, or took sildenafil/tadalafil in the last 48 h."
+    window: "Best outcome if an artery is opened within 90 min of reaching a cath-lab hospital. Go to the CATH LAB hospital, not the nearest clinic."
+
+  - id: stroke
+    title: "Stroke (BE FAST)"
+    recognise:
+      - "B alance suddenly lost.  E yes: sudden vision loss."
+      - "F ace drooping one side (ask them to smile).  A rm: one arm drifts down when both raised."
+      - "S peech slurred or strange.  T ime: call now and note the time."
+      - "Also: sudden worst-ever headache, sudden confusion."
+    do:
+      - "Call 112/108 and say the word STROKE."
+      - "Lie them down, head and shoulders slightly raised. If drowsy or vomiting: on their side."
+      - "Note the exact 'last seen normal' time. Bring the medicine list."
+    dont:
+      - "NO aspirin, NO food, NO water, NO BP tablets. Some strokes are bleeds; only a CT scan can tell."
+      - "Do not wait to see if it passes, even if symptoms go away."
+    window: "Clot-busting must start within 4.5 hours of onset. Go to the hospital with a 24x7 CT scanner and a doctor who thrombolyses."
+
+  - id: low_sugar
+    title: "Low sugar (hypoglycaemia) - most likely for Mom"
+    recognise:
+      - "Sweating, shaking, hunger, palpitations; then confusion, odd behaviour, slurred speech, drowsiness, seizure."
+      - "Elderly people may skip the warning signs and go straight to confusion."
+      - "Glucometer under 70 mg/dL confirms. Under 54 is serious."
+    do:
+      - "AWAKE and can swallow: 3 teaspoons sugar or glucose powder in water, or half a glass of juice/regular cold drink. Recheck in 15 min. Repeat if still under 70. Then a snack."
+      - "DROWSY / UNCONSCIOUS: recovery position on the side, call 112/108, glucagon injection into the thigh if you have the kit."
+      - "Even if she wakes up: sulfonylurea tablets (glimepiride, gliclazide) can drop sugar again for 24 h. Hospital observation."
+    dont:
+      - "Never put sugar, honey or liquid in the mouth of someone who cannot swallow."
+      - "No insulin."
+    window: "Minutes. Brain damage starts with prolonged severe hypoglycaemia."
+
+  - id: high_sugar
+    title: "Very high sugar / confusion in a diabetic"
+    recognise:
+      - "Meter over 300 (or reads HI), extreme thirst, lots of urine, weakness, cramps, then confusion or drowsiness."
+      - "Vomiting, deep sighing breathing, fruity breath = ketoacidosis."
+    do:
+      - "Sugar over 300 WITH vomiting, drowsiness or confusion: hospital now."
+      - "Sips of plain water only if fully alert."
+      - "Take the glucometer and the medicine strips."
+    dont:
+      - "No extra insulin without the doctor. No sugary drinks."
+    window: "Hours. Mortality rises with every hour of delay; IV fluids in hospital are the treatment."
+
+  - id: bp_crisis
+    title: "Very high BP (180/120 or more) - Dad"
+    recognise:
+      - "EMERGENCY only if there are symptoms: chest pain, breathless, severe headache, blurred vision, confusion, weakness, slurred speech, seizure."
+      - "No symptoms = urgent, not emergency."
+    do:
+      - "With symptoms: call 112/108."
+      - "No symptoms: sit quietly 5 min, recheck with cuff at heart level. Still 180/120? Call the doctor today. Confirm the usual dose was taken."
+    dont:
+      - "Do NOT give extra or double BP tablets. Do NOT crush nifedipine under the tongue. Fast drops cause strokes."
+    window: "With symptoms: treat as stroke/heart attack timing."
+
+  - id: fall
+    title: "Fall / suspected hip fracture"
+    recognise:
+      - "Cannot stand or bear weight, pain in hip/groin, leg looks shorter or turned outward."
+      - "Head strike + on blood thinners (aspirin, clopidogrel, warfarin) = needs a CT scan."
+    do:
+      - "Severe pain, deformity, or cannot move the leg: LEAVE THEM WHERE THEY ARE. Cushion the leg in the position found. Keep warm. Ambulance."
+      - "Uninjured: help them up slowly: roll to side, hands and knees, then onto a chair."
+    dont:
+      - "Do not drag them. Do not 'test' the leg. Never leave them on the floor for hours (a long lie causes kidney damage and hypothermia)."
+    window: "Surgery within 24-48 h gives the best outcome."
+
+  - id: breathing
+    title: "Breathing difficulty"
+    recognise:
+      - "Breathless at rest, cannot finish a sentence, over 30 breaths/min, blue lips, SpO2 90% or below, new confusion."
+      - "Elderly pneumonia often shows as confusion or a fall, without fever."
+    do:
+      - "Sit upright, leaning slightly forward. Loosen clothing."
+      - "Prescribed inhaler (salbutamol) with spacer if they have one."
+      - "Oxygen per the oxygen rules above. This is the ONE case where home oxygen buys time."
+      - "Call 112/108 if any red flag."
+    dont:
+      - "Do not lay them flat. No sedatives or codeine cough syrup. No high-flow oxygen in known COPD."
+    window: "Now."
+
+  - id: choking
+    title: "Choking"
+    recognise:
+      - "Clutching throat, cannot speak, cough or breathe, going blue."
+    do:
+      - "If they CAN cough: encourage coughing."
+      - "If they cannot: 5 hard back blows between the shoulder blades, then 5 abdominal thrusts. Alternate until it comes out."
+      - "If they collapse: lower to floor, call 112, start CPR."
+    dont:
+      - "No blind finger sweeps. No water."
+    window: "Seconds."
+
+  - id: cardiac_arrest
+    title: "Collapsed, unresponsive, not breathing normally (cardiac arrest)"
+    recognise:
+      - "No response to shouting and shaking. Not breathing, or only gasping / snoring irregularly. Gasping counts as NOT breathing."
+    do:
+      - "Call 112/108 on speaker. Start hands-only CPR NOW."
+      - "Heel of hand on the centre of the chest. Push HARD and FAST: 100-120 per minute, 5-6 cm deep, let the chest come back up."
+      - "Swap with someone every 2 minutes. Do not stop until the ambulance crew takes over or they move."
+      - "If an AED is there: switch it on and follow the voice."
+    dont:
+      - "Do not check for a pulse. Do not splash water. Do not wait for the ambulance before starting."
+    window: "Survival drops about 10% every minute without CPR."
+
+  - id: sepsis
+    title: "Infection getting dangerous (sepsis)"
+    recognise:
+      - "New confusion or unusual sleepiness, very fast breathing, fast heartbeat, fever OR very low temperature, cold mottled skin, very little urine."
+      - "Any infection source: urine, chest, diabetic foot, skin."
+    do:
+      - "Hospital, not the local clinic. Antibiotics are needed within the hour."
+    dont:
+      - "Do not start leftover antibiotics and wait. Do not dismiss confusion as 'age'."
+    window: "Every hour of delay raises the risk of death by about 8%."
+
+  - id: heat
+    title: "Heat stroke / dehydration"
+    recognise:
+      - "Hot skin, temperature 40 C+, confusion, staggering, seizure. Heat exhaustion: heavy sweating, weakness, cramps, dizziness."
+    do:
+      - "Move to shade / AC. Remove excess clothing. Wet the skin, fan, ice packs to neck, armpits, groin."
+      - "Fully alert: sips of ORS. Confused: nothing by mouth, ambulance, keep cooling."
+    dont:
+      - "No paracetamol for heat stroke. Do not leave them alone."
+    window: "Now."
+
+  - id: faint
+    title: "Fainting"
+    recognise:
+      - "Brief loss of consciousness, usually recovers within a minute lying down."
+    do:
+      - "Lie flat, raise legs, loosen clothing, check breathing."
+      - "Ambulance if not awake within 1-2 min, chest pain, palpitations, jerking, head injury, or over 65 with heart disease."
+    dont:
+      - "Do not sit them up quickly. No water until fully alert."
+    window: "Same-day doctor review even after full recovery."
+
+dispatcher_script:
+  title: "What to say to 112 / 108"
+  steps:
+    - "'I need an ambulance.'"
+    - "Exact location: village/colony, landmark, nearest main road, gate colour. Say you will send someone to the road to flag them."
+    - "'Patient is [age], [man/woman], [problem] since [time]. Diabetic / high BP.'"
+    - "Conscious? Breathing?"
+    - "Your callback number. Do not hang up until told."

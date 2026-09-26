@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000">
+<title>Panic Button</title>
+<style>
+  html,body { height:100%; margin:0; background:#000; color:#fff; font-family:-apple-system,system-ui,Roboto,sans-serif; overflow:hidden; -webkit-user-select:none; user-select:none; }
+  #wrap { height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:16px; box-sizing:border-box; }
+  #btn { width:min(85vw,85vh); height:min(85vw,85vh); border-radius:50%; border:12px solid #5a0000; background:radial-gradient(circle at 35% 30%, #ff5b4d, #b00000 70%); color:#fff; font-size:clamp(28px,9vw,64px); font-weight:900; letter-spacing:1px; box-shadow:0 0 60px #f00a; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  #btn:active { transform:scale(.96); }
+  #btn.sent { background:radial-gradient(circle at 35% 30%, #7dff9a, #0a7a2a 70%); border-color:#054d1a; box-shadow:0 0 60px #0f0a; }
+  #btn.fail { background:#333; border-color:#111; }
+  #status { font-size:clamp(18px,4.5vw,28px); text-align:center; min-height:2.6em; }
+  #meta { position:fixed; bottom:8px; left:0; right:0; text-align:center; font-size:13px; color:#888; }
+  #cancel { display:none; padding:14px 22px; font-size:22px; border-radius:14px; border:0; background:#444; color:#fff; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; background:#666; margin-right:6px; vertical-align:middle; }
+  .dot.ok { background:#2ecc71; } .dot.bad { background:#e74c3c; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="status">Press the red button if you feel unwell or need help.<br><span style="font-size:.8em;color:#bbb">मदद चाहिए तो लाल बटन दबाएँ</span></div>
+  <button id="btn">HELP<br>मदद</button>
+  <button id="cancel">Pressed by mistake? Cancel (<span id="cd">20</span>)</button>
+</div>
+<div id="meta"><span class="dot" id="dot"></span><span id="devlabel"></span> · <span id="net">checking…</span></div>
+
+<script>
+// ------------------------------------------------------------------
+// Configure once per phone via URL, e.g.
+//   https://alert.example.com/kiosk?device=mom-room-phone&token=DEVICE_TOKEN
+// Settings are then remembered in localStorage so the URL can be plain /kiosk.
+// ------------------------------------------------------------------
+const qs = new URLSearchParams(location.search);
+for (const k of ['device','token','hub']) { if (qs.get(k)) localStorage.setItem('kiosk_'+k, qs.get(k)); }
+const DEVICE = localStorage.getItem('kiosk_device') || '';
+const TOKEN  = localStorage.getItem('kiosk_token')  || '';
+const HUB    = (localStorage.getItem('kiosk_hub') || location.origin).replace(/\/$/,'');
+const $ = id => document.getElementById(id);
+$('devlabel').textContent = DEVICE || 'NOT CONFIGURED';
+
+let wakeLock = null;
+async function keepAwake(){ try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', ()=>setTimeout(keepAwake, 1000)); } catch(e){} }
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') keepAwake(); });
+keepAwake();
+
+async function post(path, body){
+  const r = await fetch(HUB + path, { method:'POST', headers:{'content-type':'application/json','authorization':'Bearer '+TOKEN}, body: JSON.stringify(body) });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+
+async function battery(){ try { const b = await navigator.getBattery(); return { battery: Math.round(b.level*100), charging: b.charging }; } catch(e){ return {}; } }
+
+let cancelTimer = null, activeIncident = null;
+async function panic(){
+  if(!DEVICE || !TOKEN){ $('status').textContent = 'Phone not configured. Tell Maitrabh.'; return; }
+  const btn = $('btn');
+  btn.disabled = true; $('status').textContent = 'Sending alert…';
+  try { navigator.vibrate && navigator.vibrate([300,100,300]); } catch(e){}
+  let ok = false;
+  for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+    try { const res = await post('/api/v1/alert', { device_id: DEVICE, kind:'panic', extra: { source:'kiosk', ...(await battery()), ua: navigator.userAgent.slice(0,60) } });
+          activeIncident = res.incident_id; ok = true; }
+    catch(e){ await new Promise(r=>setTimeout(r, 1500)); }
+  }
+  if(ok){
+    btn.classList.add('sent'); btn.textContent = 'ALERT SENT';
+    $('status').innerHTML = 'Help has been called. Stay where you are.<br>Someone is coming. मदद आ रही है।';
+    let left = 20; $('cancel').style.display = 'inline-block'; $('cd').textContent = left;
+    cancelTimer = setInterval(()=>{ left--; $('cd').textContent = left; if(left<=0){ clearInterval(cancelTimer); $('cancel').style.display='none'; } }, 1000);
+    setTimeout(reset, 15*60*1000);
+  } else {
+    btn.classList.add('fail'); btn.textContent = 'NO NETWORK';
+    $('status').innerHTML = 'Could not reach the server. <b>Call 112</b> or use the wall button.<br><a href="tel:112" style="color:#fff;font-size:1.4em">📞 Call 112</a>';
+    setTimeout(reset, 60*1000);
+  }
+}
+async function cancel(){
+  clearInterval(cancelTimer);
+  try { await post('/api/v1/cancel', { device_id: DEVICE }); $('status').textContent = 'Cancelled. Everyone has been told it was a mistake.'; }
+  catch(e){ $('status').textContent = 'Too late to cancel here; the family will call you.'; }
+  $('cancel').style.display='none'; setTimeout(reset, 8000);
+}
+function reset(){ const btn=$('btn'); btn.disabled=false; btn.className=''; btn.innerHTML='HELP<br>मदद'; $('status').innerHTML='Press the red button if you feel unwell or need help.<br><span style="font-size:.8em;color:#bbb">मदद चाहिए तो लाल बटन दबाएँ</span>'; $('cancel').style.display='none'; }
+
+$('btn').addEventListener('click', panic);
+$('cancel').addEventListener('click', cancel);
+
+async function heartbeat(){
+  if(!DEVICE || !TOKEN) return;
+  try { const r = await post('/api/v1/heartbeat', { device_id: DEVICE, extra: { source:'kiosk', ...(await battery()) } });
+        $('dot').className='dot ok'; $('net').textContent = 'connected ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ $('dot').className='dot bad'; $('net').textContent = 'OFFLINE: ' + e.message; }
+}
+heartbeat(); setInterval(heartbeat, 60*1000);
+</script>
+</body>
+</html>
